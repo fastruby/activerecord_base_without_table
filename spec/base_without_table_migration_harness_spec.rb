@@ -6,7 +6,7 @@ RSpec.describe ActiveRecord::BaseWithoutTable do
     it 'allows specification of its own attributes', focus: true do
       byebug
       base_without_table_class = Class.new(ActiveRecord::BaseWithoutTable) do
-        column :created_at, :datetime
+        column :something_at, :datetime
         column :due_on, :date
         column :start_time, :time
         column :external_id, :integer
@@ -16,7 +16,7 @@ RSpec.describe ActiveRecord::BaseWithoutTable do
       end
 
       instance = base_without_table_class.new(
-        created_at: '2019-01-01 00:00:00.000000',
+        something_at: '2019-01-01 00:00:00.000000',
         due_on: '2020-01-01',
         start_time: '00:00:00',
         external_id: '1',
@@ -26,7 +26,7 @@ RSpec.describe ActiveRecord::BaseWithoutTable do
       )
 
       expect(instance).to have_attributes(
-        created_at: Time.zone.parse('2019-01-01T00:00:00Z'),
+        something_at: Time.zone.parse('2019-01-01T00:00:00Z'),
         due_on: Date.parse('2020-01-01'),
         start_time: Time.zone.parse('2000-01-01T00:00:00Z'),
         external_id: 1,

@@ -21,14 +21,13 @@ module ActiveRecord
 
     attr_accessor :attributes
 
-    def create_or_update # :nodoc:
-      errors.empty?
+    def initialize(*args)
+      self.class.define_attribute_methods
+      super(*args)
     end
 
-    def initialize(attrs = {}, _options = {})
-      attributes_builder = ::ActiveRecord::AttributeSet::Builder.new(build_column_types)
-      @attributes = attributes_builder.build_from_database(attrs.to_hash.transform_keys(&:to_s))
-	  self.class.define_attribute_methods
+    def create_or_update # :nodoc:
+      errors.empty?
     end
 
     def build_column_types
@@ -86,7 +85,10 @@ module ActiveRecord
       end
 
       def attribute_names
-        columns_hash.transform_keys(&:to_s).keys
+        puts 'attr names'
+        puts _default_attributes.keys.map(&:to_s)
+        puts '=' * 80
+        _default_attributes.keys.map(&:to_s)
       end
 
       def column_defaults
@@ -118,10 +120,11 @@ module ActiveRecord
         end.to_s
 
         cast_type = "ActiveRecord::Type::#{mapped_sql_type.camelize}".constantize.new
+        define_attribute(name.to_s, cast_type, default: default)
 
-        self.columns += [ActiveRecord::ConnectionAdapters::Column.new(name.to_s, default, cast_type, mapped_sql_type, null)]
+        #self.columns += [ActiveRecord::ConnectionAdapters::Column.new(name.to_s, default, cast_type, mapped_sql_type, null)]
 
-        reset_column_information
+        #reset_column_information
       end
 
       # Do not reset @columns
