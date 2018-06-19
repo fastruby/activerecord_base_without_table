@@ -3,7 +3,8 @@ require 'rails_helper'
 
 RSpec.describe ActiveRecord::BaseWithoutTable do
   context 'when specifying columns' do
-    it 'allows specification of its own attributes' do
+    it 'allows specification of its own attributes', focus: true do
+      byebug
       base_without_table_class = Class.new(ActiveRecord::BaseWithoutTable) do
         column :created_at, :datetime
         column :due_on, :date

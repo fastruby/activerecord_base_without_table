@@ -19,11 +19,76 @@ module ActiveRecord
     class_attribute :columns
     self.columns = []
 
+    attr_accessor :attributes
+
     def create_or_update # :nodoc:
       errors.empty?
     end
 
+    def initialize(attrs = {}, _options = {})
+      attributes_builder = ::ActiveRecord::AttributeSet::Builder.new(build_column_types)
+      @attributes = attributes_builder.build_from_database(attrs.to_hash.transform_keys(&:to_s))
+	  self.class.define_attribute_methods
+    end
+
+    def build_column_types
+      puts self.class.columns.inspect
+      self.class.columns.reduce({}) do |acc, column|
+        acc.merge(column.name.to_s => column.sql_type_metadata)
+      end
+    end
+
+    def lookup_column_type(sql_type)
+      # This is copy-pasted from ActiveRecord::BaseWithoutTable, please find another approach.
+      mapped_sql_type = case sql_type
+                        when :datetime
+                          :date_time
+                        when :datetime_point
+                          :integer
+                        when :enumerable
+                          :value
+                        else
+                          sql_type
+                        end.to_s
+                        puts '=' * 80
+                        puts sql_type
+                        puts mapped_sql_type
+                        puts '=' * 80
+                        "::ActiveRecord::Type::#{mapped_sql_type.camelize}".constantize.new
+    end
+
     class << self
+      def connection
+        Class.new(SimpleDelegator) do
+          def schema_cache
+            Class.new do
+              def columns(*args)
+                []
+              end
+
+              def columns_hash(*args)
+                {}
+              end
+            end.new
+          end
+        end.new(super)
+      end
+
+      def table_exists?
+        false
+      end
+
+      def inherited(subclass)
+        subclass.define_singleton_method(:table_name) do
+          "activerecord_base_without_table_#{subclass.name}"
+        end
+        super(subclass)
+      end
+
+      def attribute_names
+        columns_hash.transform_keys(&:to_s).keys
+      end
+
       def column_defaults
         columns.each_with_object(ActiveSupport::HashWithIndifferentAccess.new) do |current, res|
           res[current.name] = current.default
@@ -31,9 +96,7 @@ module ActiveRecord
       end
 
       def columns_hash
-        all_columns = add_user_provided_columns(columns)
-
-        @columns_hash = all_columns.each_with_object(ActiveSupport::HashWithIndifferentAccess.new) do |current, res|
+        @columns_hash = columns.each_with_object(ActiveSupport::HashWithIndifferentAccess.new) do |current, res|
           res[current.name] = current
         end
       end
