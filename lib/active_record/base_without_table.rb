@@ -21,29 +21,19 @@ module ActiveRecord
   # This model can be used just like a regular model based on a table, except it
   # will never be saved to the database.
   #
-  class BaseWithoutTable < Base
-    self.abstract_class = true
+  class BaseWithoutTable
+    include ActiveModel::Model
+    include ActiveModel::Attributes
+    include ActiveRecord::AttributeMethods::BeforeTypeCast
+    include ActiveModel::Validations
+    include ActiveModel::Validations::Callbacks
+    extend ActiveModel::Validations::HelperMethods
+    extend ActiveModel::Callbacks
+    extend ActiveRecord::Sanitization::ClassMethods
+
+    define_model_callbacks :initialize
 
     class << self
-      def connection
-        ConnectionAdapters::NullAdapter.new(super)
-      end
-
-      def attributes_builder
-        AttributesBuilderWithoutTable.new(super)
-      end
-
-      def table_exists?
-        false
-      end
-
-      def inherited(subclass)
-        subclass.define_singleton_method(:table_name) do
-          "activerecord_base_without_table_#{subclass.name}"
-        end
-        super(subclass)
-      end
-
       def attribute_names
         _default_attributes.keys.map(&:to_s)
       end
@@ -67,7 +57,11 @@ module ActiveRecord
             sql_type
           end.to_s.camelize
 
-        "::ActiveRecord::Type::#{mapped_sql_type}".constantize.new
+          if mapped_sql_type == "DateTime"
+            ::ActiveRecord::AttributeMethods::TimeZoneConversion::TimeZoneConverter.new(::ActiveRecord::Type::DateTime.new)
+          else
+            "::ActiveRecord::Type::#{mapped_sql_type}".constantize.new
+          end
       end
 
       def gettext_translation_for_attribute_name(attribute)
@@ -81,6 +75,24 @@ module ActiveRecord
         else
           "#{self}|#{attribute.split('.').map!(&:humanize).join('|')}"
         end
+      end
+
+      def find_by_sql(sql_query, binds = [])
+        execute_query(sql_query, binds).map(&method(:new))
+      end
+
+      def execute_query(sql_query, binds)
+        ::ActiveRecord::Base.connection.select_all(
+          sanitize_sql(sql_query),
+          "#{self.class.name} Load",
+          binds
+        )
+      end
+    end
+
+    def initialize(*args)
+      run_callbacks :initialize do
+        super
       end
     end
   end

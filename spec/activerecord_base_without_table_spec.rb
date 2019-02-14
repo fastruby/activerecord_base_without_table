@@ -15,12 +15,12 @@ RSpec.describe ActiveRecord::BaseWithoutTable do
       end
 
       instance = base_without_table_class.new(
-        created_at: '2019-01-01 00:00:00.000000',
+        created_at: Time.zone.parse('2019-01-01T05:00:00Z'),
         due_on: '2020-01-01',
         start_time: '00:00:00',
         external_id: '1',
         is_something: 't',
-        number: '1.2345678901',
+        number: BigDecimal('1.2345678901'),
         description: 'My description'
       )
 
