@@ -31,6 +31,8 @@ module ActiveRecord
     extend ActiveModel::Callbacks
     extend ActiveRecord::Sanitization::ClassMethods
 
+    class_attribute :associations_to_eager_load 
+
     define_model_callbacks :initialize
 
     class << self
@@ -81,6 +83,31 @@ module ActiveRecord
         execute_query(sql_query, binds).map(&method(:new))
       end
 
+      def belongs_to(association_name, options = {})
+        self.associations_to_eager_load ||= []
+        self.associations_to_eager_load += [[association_name, options]]
+        attribute association_name
+      end
+
+      def init_belongs_to(results, association, foreign_key: "#{association}_id", class_name: association.to_s)
+        associated_class = case class_name
+                           when String
+                             class_name.classify.constantize
+                           when Class
+                             class_name
+                           else
+                             raise "Invalid class #{class_name.inspect}"
+                           end
+
+        association_ids = results.map { |result| result.send(foreign_key) }.compact
+        associated_objects_by_id = associated_class.find(association_ids).index_by(&:id)
+
+        results.each do |result|
+          association_id = result.send(foreign_key)
+          result.send("#{association}=", associated_objects_by_id[association_id])
+        end
+      end
+
       def execute_query(sql_query, binds)
         ::ActiveRecord::Base.connection.select_all(
           sanitize_sql(sql_query),
@@ -93,6 +120,12 @@ module ActiveRecord
     def initialize(*args)
       run_callbacks :initialize do
         super
+
+        if self.class.associations_to_eager_load
+          self.class.associations_to_eager_load.each do |association_name, options = {}|
+            self.class.init_belongs_to([self], association_name, options)
+          end
+        end
       end
     end
   end
