@@ -29,9 +29,7 @@ module ActiveRecord
     extend ActiveRecord::Sanitization::ClassMethods
 
     attribute_method_suffix '?'
-
     class_attribute :associations_to_eager_load
-
     define_model_callbacks :initialize
 
     class << self
@@ -83,7 +81,19 @@ module ActiveRecord
       end
 
       def find_by_sql(sql_query, binds = [])
-        execute_query(sql_query, binds).map(&method(:new))
+        results = execute_query(sql_query, binds).map { |attributes| new(attributes, false) }
+
+        eager_load_associations(results)
+
+        results
+      end
+
+      def eager_load_associations(parent_records)
+        return unless associations_to_eager_load
+
+        associations_to_eager_load.each do |association_name, options = {}|
+          init_belongs_to(parent_records, association_name, options)
+        end
       end
 
       def belongs_to(association_name, options = {})
@@ -120,15 +130,11 @@ module ActiveRecord
       end
     end
 
-    def initialize(*args)
+    def initialize(attributes = {}, load_associations = true)
       run_callbacks :initialize do
-        super
+        super(attributes)
 
-        if self.class.associations_to_eager_load
-          self.class.associations_to_eager_load.each do |association_name, options = {}|
-            self.class.init_belongs_to([self], association_name, options)
-          end
-        end
+        self.class.eager_load_associations([self]) if load_associations
       end
     end
 
