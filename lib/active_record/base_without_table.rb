@@ -24,6 +24,7 @@ module ActiveRecord
   class BaseWithoutTable
     include ActiveModel::Model
     include ActiveModel::Attributes
+    include ActiveModel::AttributeMethods
     include ActiveRecord::AttributeMethods::BeforeTypeCast
     include ActiveModel::Validations
     include ActiveModel::Validations::Callbacks
@@ -31,7 +32,9 @@ module ActiveRecord
     extend ActiveModel::Callbacks
     extend ActiveRecord::Sanitization::ClassMethods
 
-    class_attribute :associations_to_eager_load 
+    attribute_method_suffix '?'
+
+    class_attribute :associations_to_eager_load
 
     define_model_callbacks :initialize
 
@@ -42,6 +45,10 @@ module ActiveRecord
 
       def column(name, sql_type = nil, default = nil, null = true)
         attribute name, lookup_attribute_type(sql_type), default: default, null: null
+
+        if sql_type == :boolean
+          define_attribute_methods name
+        end
       end
 
       def lookup_attribute_type(sql_type)
@@ -127,6 +134,12 @@ module ActiveRecord
           end
         end
       end
+    end
+
+    private
+
+    def attribute?(attribute_name)
+      send(attribute_name)
     end
   end
 end
